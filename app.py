@@ -2,6 +2,7 @@ import re
 from io import BytesIO
 from typing import Iterable, List, Tuple
 
+import pandas as pd
 import requests
 import streamlit as st
 from pypdf import PdfReader, PdfWriter
@@ -18,14 +19,32 @@ DEFAULT_TIMEOUT = 120
 # ---------------------------
 # Helpers
 # ---------------------------
+def clean_code(value: str) -> str:
+    value = str(value).strip()
+    if not value:
+        return ""
+
+    # If code contains "-", take the part after the first dash
+    if "-" in value:
+        value = value.split("-", 1)[1].strip()
+
+    return value
+
+
 def normalize_codes(raw_codes: Iterable[str]) -> List[str]:
     codes = []
+
     for item in raw_codes:
-        if not item:
+        if item is None:
             continue
-        parts = re.split(r"[\s,;]+", item.strip())
+
+        item_str = str(item).strip()
+        if not item_str:
+            continue
+
+        parts = re.split(r"[\s,;]+", item_str)
         for part in parts:
-            part = part.strip()
+            part = clean_code(part)
             if part:
                 codes.append(part)
 
@@ -35,6 +54,7 @@ def normalize_codes(raw_codes: Iterable[str]) -> List[str]:
         if code not in seen:
             seen.add(code)
             unique_codes.append(code)
+
     return unique_codes
 
 
@@ -95,6 +115,18 @@ def ensure_pdf_filename(filename: str) -> str:
     return filename
 
 
+def read_excel_file(uploaded_file) -> pd.DataFrame:
+    return pd.read_excel(uploaded_file)
+
+
+def extract_codes_from_selected_column(df: pd.DataFrame, selected_column: str) -> List[str]:
+    if selected_column not in df.columns:
+        return []
+
+    values = df[selected_column].dropna().astype(str).tolist()
+    return normalize_codes(values)
+
+
 # ---------------------------
 # Page config
 # ---------------------------
@@ -120,8 +152,6 @@ st.markdown(
             --grey-border: #d1d5db;
             --grey-text: #4b5563;
             --grey-muted: #6b7280;
-            --success-bg: #eef6f1;
-            --warning-bg: #fff7ed;
         }
 
         .stApp {
@@ -131,7 +161,7 @@ st.markdown(
         .block-container {
             padding-top: 2rem;
             padding-bottom: 2rem;
-            max-width: 900px;
+            max-width: 1000px;
         }
 
         .hero-card {
@@ -191,6 +221,28 @@ st.markdown(
             margin-bottom: 0.8rem;
         }
 
+        .input-panel {
+            background: white;
+            border: 1px solid var(--grey-border);
+            border-radius: 14px;
+            padding: 1rem;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+            height: 100%;
+        }
+
+        .panel-title {
+            color: var(--navy);
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .panel-subtitle {
+            color: var(--grey-muted);
+            font-size: 0.88rem;
+            margin-bottom: 0.8rem;
+        }
+
         div[data-testid="stTextArea"] textarea {
             background-color: #fbfbfc !important;
             border: 1px solid var(--grey-border) !important;
@@ -199,16 +251,17 @@ st.markdown(
             font-size: 0.95rem !important;
         }
 
-        div[data-testid="stTextInput"] input {
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] {
             background-color: #fbfbfc !important;
-            border: 1px solid var(--grey-border) !important;
             border-radius: 12px !important;
-            color: #111827 !important;
         }
 
         div[data-testid="stTextArea"] label,
         div[data-testid="stTextInput"] label,
-        div[data-testid="stCheckbox"] label {
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stFileUploader"] label {
             color: var(--navy) !important;
             font-weight: 600 !important;
         }
@@ -311,19 +364,84 @@ st.markdown(
     <div class="section-card">
         <div class="section-title">Build your PDF pack</div>
         <div class="section-subtitle">
-            Paste one code per line, or separate codes with commas, spaces, or semicolons.
+            Add codes manually or upload an Excel file and select the column containing the item codes.
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-codes_text = st.text_area(
-    "Item codes",
-    height=220,
-    placeholder="Example:\n01423\nK40930\n20211.B",
-    label_visibility="collapsed",
-)
+manual_codes = []
+excel_codes = []
+excel_df = None
+uploaded_excel = None
+
+input_col1, input_col2 = st.columns(2)
+
+with input_col1:
+    st.markdown(
+        """
+        <div class="input-panel">
+            <div class="panel-title">Paste item codes</div>
+            <div class="panel-subtitle">
+                Enter one code per line, or separate them with commas, spaces, or semicolons.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    codes_text = st.text_area(
+        "Paste item codes",
+        height=220,
+        placeholder="Example:\n01423\nK40930\nABC-20211.B",
+        label_visibility="collapsed",
+    )
+
+    manual_codes = normalize_codes(codes_text.splitlines())
+
+with input_col2:
+    st.markdown(
+        """
+        <div class="input-panel">
+            <div class="panel-title">Upload Excel file</div>
+            <div class="panel-subtitle">
+                Upload an Excel file, then choose the column that contains the item codes.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    uploaded_excel = st.file_uploader(
+        "Upload Excel file",
+        type=["xlsx", "xls"],
+        label_visibility="collapsed",
+    )
+
+    if uploaded_excel is not None:
+        try:
+            excel_df = read_excel_file(uploaded_excel)
+
+            if excel_df.empty:
+                st.warning("The uploaded Excel file is empty.")
+            else:
+                column_options = excel_df.columns.tolist()
+
+                default_index = 0
+                if "Item No.1" in column_options:
+                    default_index = column_options.index("Item No.1")
+
+                selected_column = st.selectbox(
+                    "Select the column containing item codes",
+                    options=column_options,
+                    index=default_index,
+                )
+
+                excel_codes = extract_codes_from_selected_column(excel_df, selected_column)
+                st.caption(f"{len(excel_codes)} code(s) detected from Excel.")
+        except Exception as e:
+            st.error(f"Could not read Excel file: {e}")
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -334,7 +452,8 @@ with col2:
 st.markdown(
     """
     <div class="info-note">
-        The application will try multiple Vimar PDF endpoints for each code and merge all successful results into one file.
+        If a code contains a dash, the part after the first dash will be used as the final item code.
+        Codes from manual input and Excel are combined automatically and duplicates are removed.
     </div>
     """,
     unsafe_allow_html=True,
@@ -347,10 +466,10 @@ run_clicked = st.button("Build PDF Pack", type="primary", use_container_width=Tr
 # Action / Processing
 # ---------------------------
 if run_clicked:
-    codes = normalize_codes(codes_text.splitlines())
+    codes = normalize_codes(manual_codes + excel_codes)
 
     if not codes:
-        st.error("Please enter at least one item code.")
+        st.error("Please enter item codes manually or upload an Excel file.")
     else:
         session = get_session()
         downloaded_pdfs = []
