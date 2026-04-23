@@ -516,7 +516,7 @@ with input_col2:
 col1, col2 = st.columns([1, 1])
 with col1:
     keep_going = st.checkbox("Skip failed codes and continue", value=True)
-with col2:
+# with col2:
     output_name = st.text_input("Output file name", value="vimar_datasheet_pack.pdf")
 
 st.markdown(
