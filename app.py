@@ -15,6 +15,7 @@ BASE_URLS = [
 ]
 
 DEFAULT_TIMEOUT = (20, 40)
+PDF_DOWNLOAD_RETRIES = 2
 
 
 # ---------------------------
@@ -68,6 +69,15 @@ def looks_like_pdf(response: requests.Response) -> bool:
     return response.content[:5] == b"%PDF-"
 
 
+def is_valid_pdf_bytes(pdf_bytes: bytes) -> bool:
+    try:
+        reader = PdfReader(BytesIO(pdf_bytes), strict=False)
+        _ = len(reader.pages)
+        return True
+    except Exception:
+        return False
+
+
 def get_session() -> requests.Session:
     session = requests.Session()
     session.headers.update(
@@ -84,12 +94,16 @@ def download_pdf_bytes_for_code(
 ) -> Tuple[bool, bytes | None, str | None]:
     for url_template in BASE_URLS:
         url = url_template.format(code=code)
-        try:
-            response = session.get(url, timeout=DEFAULT_TIMEOUT, allow_redirects=True)
-            if response.status_code == 200 and looks_like_pdf(response):
-                return True, response.content, url
-        except requests.RequestException:
-            pass
+
+        for _ in range(PDF_DOWNLOAD_RETRIES):
+            try:
+                response = session.get(url, timeout=DEFAULT_TIMEOUT, allow_redirects=True)
+                if response.status_code == 200 and looks_like_pdf(response):
+                    pdf_bytes = response.content
+                    if is_valid_pdf_bytes(pdf_bytes):
+                        return True, pdf_bytes, url
+            except requests.RequestException:
+                pass
 
     return False, None, None
 
@@ -98,7 +112,7 @@ def merge_pdf_bytes(pdf_byte_list: List[bytes]) -> bytes:
     writer = PdfWriter()
 
     for pdf_bytes in pdf_byte_list:
-        reader = PdfReader(BytesIO(pdf_bytes))
+        reader = PdfReader(BytesIO(pdf_bytes), strict=False)
         for page in reader.pages:
             writer.add_page(page)
 
@@ -126,6 +140,7 @@ def extract_codes_from_selected_column(df: pd.DataFrame, selected_column: str) -
     values = df[selected_column].dropna().astype(str).tolist()
     return normalize_codes(values)
 
+
 def process_code(code: str) -> dict:
     session = get_session()
     ok, pdf_bytes, used_url = download_pdf_bytes_for_code(session, code)
@@ -136,6 +151,7 @@ def process_code(code: str) -> dict:
         "pdf_bytes": pdf_bytes,
         "used_url": used_url,
     }
+
 
 def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
     downloaded_pdfs = []
@@ -526,7 +542,7 @@ if run_clicked:
         st.error("Please enter item codes manually or upload an Excel file.")
     else:
         max_workers = min(8, max(1, len(codes)))
-        
+
         downloaded_pdfs, success_rows, failed_codes, _ = download_pdfs_parallel(
             codes=codes,
             max_workers=max_workers,
@@ -580,7 +596,6 @@ if run_clicked:
 
             except Exception as e:
                 st.error(f"Failed to merge PDFs: {e}")
-
 
 st.markdown(
     """
