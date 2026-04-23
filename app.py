@@ -522,7 +522,6 @@ with col1:
 st.markdown(
     """
     <div class="info-note">
-        # If a code contains a dash, the part after the first dash will be used as the final item code.
         Codes from manual input and Excel are combined automatically and duplicates are removed.
     </div>
     """,
