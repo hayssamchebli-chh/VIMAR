@@ -465,7 +465,7 @@ with input_col1:
     codes_text = st.text_area(
         "Paste item codes",
         height=220,
-        placeholder="Example:\n01423\nK40930\nABC-20211.B",
+        placeholder="Example:\n00200\nK40930\nVIM-09208.C",
         label_visibility="collapsed",
     )
 
