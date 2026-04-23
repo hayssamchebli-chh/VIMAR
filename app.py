@@ -24,7 +24,6 @@ def clean_code(value: str) -> str:
     if not value:
         return ""
 
-    # If code contains "-", take the part after the first dash
     if "-" in value:
         value = value.split("-", 1)[1].strip()
 
@@ -138,7 +137,7 @@ st.set_page_config(
 
 
 # ---------------------------
-# Custom CSS (Grey + Navy Theme)
+# Custom CSS
 # ---------------------------
 st.markdown(
     """
@@ -150,7 +149,6 @@ st.markdown(
             --grey-bg: #f3f4f6;
             --grey-card: #ffffff;
             --grey-border: #d1d5db;
-            --grey-text: #4b5563;
             --grey-muted: #6b7280;
         }
 
@@ -221,15 +219,6 @@ st.markdown(
             margin-bottom: 0.8rem;
         }
 
-        .input-panel {
-            background: white;
-            border: 1px solid var(--grey-border);
-            border-radius: 14px;
-            padding: 1rem;
-            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
-            height: 100%;
-        }
-
         .panel-title {
             color: var(--navy);
             font-size: 1rem;
@@ -249,12 +238,28 @@ st.markdown(
             border-radius: 12px !important;
             color: #111827 !important;
             font-size: 0.95rem !important;
+            min-height: 220px !important;
         }
 
         div[data-testid="stTextInput"] input,
         div[data-testid="stSelectbox"] div[data-baseweb="select"] {
             background-color: #fbfbfc !important;
             border-radius: 12px !important;
+        }
+
+        div[data-testid="stFileUploader"] {
+            background: #fbfbfc !important;
+            border: 2px dashed #b9c2d0 !important;
+            border-radius: 12px !important;
+            padding: 24px !important;
+            min-height: 220px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        div[data-testid="stFileUploader"] section {
+            width: 100%;
         }
 
         div[data-testid="stTextArea"] label,
@@ -381,11 +386,9 @@ input_col1, input_col2 = st.columns(2)
 with input_col1:
     st.markdown(
         """
-        <div class="input-panel">
-            <div class="panel-title">Paste item codes</div>
-            <div class="panel-subtitle">
-                Enter one code per line, or separate them with commas, spaces, or semicolons.
-            </div>
+        <div class="panel-title">Paste item codes</div>
+        <div class="panel-subtitle">
+            Enter one code per line, or separate them with commas, spaces, or semicolons.
         </div>
         """,
         unsafe_allow_html=True,
@@ -403,11 +406,9 @@ with input_col1:
 with input_col2:
     st.markdown(
         """
-        <div class="input-panel">
-            <div class="panel-title">Upload Excel file</div>
-            <div class="panel-subtitle">
-                Upload an Excel file, then choose the column that contains the item codes.
-            </div>
+        <div class="panel-title">Upload Excel file</div>
+        <div class="panel-subtitle">
+            Drag and drop your Excel file here, or browse to upload it.
         </div>
         """,
         unsafe_allow_html=True,
@@ -440,6 +441,7 @@ with input_col2:
 
                 excel_codes = extract_codes_from_selected_column(excel_df, selected_column)
                 st.caption(f"{len(excel_codes)} code(s) detected from Excel.")
+
         except Exception as e:
             st.error(f"Could not read Excel file: {e}")
 
