@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import streamlit as st
 from pypdf import PdfReader, PdfWriter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_URLS = [
     "https://www.vimar.com/en/int/catalog/product/download-pdf/code/{code}?type=.pdf",
@@ -13,7 +14,7 @@ BASE_URLS = [
     "https://www.vimar.com/en/int/catalog/document/download-pdf/code/{code}?type=.pdf",
 ]
 
-DEFAULT_TIMEOUT = 120
+DEFAULT_TIMEOUT = (20, 40)
 
 
 # ---------------------------
@@ -124,6 +125,57 @@ def extract_codes_from_selected_column(df: pd.DataFrame, selected_column: str) -
 
     values = df[selected_column].dropna().astype(str).tolist()
     return normalize_codes(values)
+
+def process_code(code: str) -> dict:
+    session = get_session()
+    ok, pdf_bytes, used_url = download_pdf_bytes_for_code(session, code)
+
+    return {
+        "code": code,
+        "ok": ok,
+        "pdf_bytes": pdf_bytes,
+        "used_url": used_url,
+    }
+
+def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
+    downloaded_pdfs = []
+    success_rows = []
+    failed_codes = []
+
+    results = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_code = {executor.submit(process_code, code): code for code in codes}
+
+        completed = 0
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        for future in as_completed(future_to_code):
+            result = future.result()
+            completed += 1
+
+            code = result["code"]
+            status_text.info(f"Processed {completed} of {len(codes)} — {code}")
+            progress_bar.progress(completed / len(codes))
+
+            if result["ok"] and result["pdf_bytes"]:
+                downloaded_pdfs.append(result["pdf_bytes"])
+                success_rows.append(
+                    {
+                        "Code": code,
+                        "Status": "Downloaded",
+                        "Source URL": result["used_url"],
+                    }
+                )
+            else:
+                failed_codes.append(code)
+
+            results.append(result)
+
+        status_text.empty()
+
+    return downloaded_pdfs, success_rows, failed_codes, results
 
 
 # ---------------------------
@@ -473,37 +525,12 @@ if run_clicked:
     if not codes:
         st.error("Please enter item codes manually or upload an Excel file.")
     else:
-        session = get_session()
-        downloaded_pdfs = []
-        success_rows = []
-        failed_codes = []
-
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-        for idx, code in enumerate(codes, start=1):
-            status_text.info(f"Processing code {idx} of {len(codes)} — {code}")
-            ok, pdf_bytes, used_url = download_pdf_bytes_for_code(session, code)
-
-            if ok and pdf_bytes:
-                downloaded_pdfs.append(pdf_bytes)
-                success_rows.append(
-                    {
-                        "Code": code,
-                        "Status": "Downloaded",
-                        "Source URL": used_url,
-                    }
-                )
-            else:
-                failed_codes.append(code)
-                if not keep_going:
-                    progress_bar.progress(idx / len(codes))
-                    break
-
-            progress_bar.progress(idx / len(codes))
-
-        status_text.empty()
-
+        max_workers = min(8, max(1, len(codes)))
+        
+        downloaded_pdfs, success_rows, failed_codes, _ = download_pdfs_parallel(
+            codes=codes,
+            max_workers=max_workers,
+        )
         submitted_count = len(codes)
         downloaded_count = len(downloaded_pdfs)
         failed_count = len(failed_codes)
