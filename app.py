@@ -141,11 +141,12 @@ def extract_codes_from_selected_column(df: pd.DataFrame, selected_column: str) -
     return normalize_codes(values)
 
 
-def process_code(code: str) -> dict:
+def process_code(index: int, code: str) -> dict:
     session = get_session()
     ok, pdf_bytes, used_url = download_pdf_bytes_for_code(session, code)
 
     return {
+        "index": index,
         "code": code,
         "ok": ok,
         "pdf_bytes": pdf_bytes,
@@ -161,7 +162,10 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
     results = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_code = {executor.submit(process_code, code): code for code in codes}
+        future_to_code = {
+            executor.submit(process_code, index, code): code
+            for index, code in enumerate(codes)
+        }
 
         completed = 0
         progress_bar = st.progress(0)
@@ -175,21 +179,25 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
             status_text.info(f"Processed {completed} of {len(codes)} — {code}")
             progress_bar.progress(completed / len(codes))
 
-            if result["ok"] and result["pdf_bytes"]:
-                downloaded_pdfs.append(result["pdf_bytes"])
-                success_rows.append(
-                    {
-                        "Code": code,
-                        "Status": "Downloaded",
-                        "Source URL": result["used_url"],
-                    }
-                )
-            else:
-                failed_codes.append(code)
-
             results.append(result)
 
         status_text.empty()
+
+    # Sort back to the original input order
+    results.sort(key=lambda x: x["index"])
+
+    for result in results:
+        if result["ok"] and result["pdf_bytes"]:
+            downloaded_pdfs.append(result["pdf_bytes"])
+            success_rows.append(
+                {
+                    "Code": result["code"],
+                    "Status": "Downloaded",
+                    "Source URL": result["used_url"],
+                }
+            )
+        else:
+            failed_codes.append(result["code"])
 
     return downloaded_pdfs, success_rows, failed_codes, results
 
