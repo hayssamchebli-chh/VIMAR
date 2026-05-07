@@ -806,18 +806,6 @@ st.markdown(
                     <div class="brand-payoff">energia positiva</div>
                 </div>
             </div>
-            <div class="search-pill">
-                <span>Search on the site</span>
-                <span class="search-dot"></span>
-            </div>
-        </div>
-        <div class="nav-row">
-            <div class="nav-item">Products</div>
-            <div class="nav-item">Solutions</div>
-            <div class="nav-item">Services for professionals</div>
-            <div class="nav-item">News &amp; documentation</div>
-            <div class="nav-item">Contacts</div>
-            <div class="nav-item">Company</div>
         </div>
     </div>
     """,
