@@ -941,7 +941,7 @@ st.markdown(
         <div class="section-eyebrow">Pack settings</div>
         <div class="section-title">Cover and output</div>
         <div class="section-subtitle">
-            Leave the cover field empty to use the default cover PDF included in the repository.
+            Leave the cover field empty to use the default cover PDF.
         </div>
     </div>
     """,
