@@ -798,13 +798,10 @@ st.markdown(
     <div class="vimar-shell">
         <div class="utility-bar">
             <span>Product catalogue</span>
-            <span>Work with us</span>
             <span>MyVIMAR</span>
         </div>
         <div class="brand-row">
             <div class="brand-lockup">
-                <div class="brand-symbol" aria-hidden="true"></div>
-                <div>
                     <div class="brand-word">VIMAR</div>
                     <div class="brand-payoff">energia positiva</div>
                 </div>
