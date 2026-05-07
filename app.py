@@ -1,5 +1,6 @@
 import re
 from io import BytesIO
+from pathlib import Path
 from typing import Iterable, List, Tuple
 
 import pandas as pd
@@ -16,6 +17,13 @@ BASE_URLS = [
 
 DEFAULT_TIMEOUT = (20, 40)
 PDF_DOWNLOAD_RETRIES = 2
+
+APP_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+DEFAULT_COVER_PATHS = [
+    APP_DIR / "cover.pdf",
+    APP_DIR / "cover",
+    APP_DIR / "cover" / "cover.pdf",
+]
 
 
 # ---------------------------
@@ -78,6 +86,35 @@ def is_valid_pdf_bytes(pdf_bytes: bytes) -> bool:
         return False
 
 
+def read_default_cover_pdf_bytes() -> bytes | None:
+    for cover_path in DEFAULT_COVER_PATHS:
+        if cover_path.is_file():
+            cover_pdf_bytes = cover_path.read_bytes()
+            if is_valid_pdf_bytes(cover_pdf_bytes):
+                return cover_pdf_bytes
+
+    return None
+
+
+def get_cover_pdf_bytes(uploaded_cover) -> Tuple[bytes | None, str | None]:
+    if uploaded_cover is not None:
+        cover_pdf_bytes = uploaded_cover.getvalue()
+        if is_valid_pdf_bytes(cover_pdf_bytes):
+            return cover_pdf_bytes, None
+
+        return None, "The uploaded cover file is not a valid PDF."
+
+    cover_pdf_bytes = read_default_cover_pdf_bytes()
+    if cover_pdf_bytes is not None:
+        return cover_pdf_bytes, None
+
+    return (
+        None,
+        "Default cover PDF was not found or is invalid. "
+        "Add cover.pdf to the repository root, or upload a custom cover PDF.",
+    )
+
+
 def get_session() -> requests.Session:
     session = requests.Session()
     session.headers.update(
@@ -108,8 +145,13 @@ def download_pdf_bytes_for_code(
     return False, None, None
 
 
-def merge_pdf_bytes(pdf_byte_list: List[bytes]) -> bytes:
+def merge_pdf_bytes(pdf_byte_list: List[bytes], cover_pdf_bytes: bytes | None = None) -> bytes:
     writer = PdfWriter()
+
+    if cover_pdf_bytes:
+        cover_reader = PdfReader(BytesIO(cover_pdf_bytes), strict=False)
+        for page in cover_reader.pages:
+            writer.add_page(page)
 
     for pdf_bytes in pdf_byte_list:
         reader = PdfReader(BytesIO(pdf_bytes), strict=False)
@@ -524,8 +566,14 @@ with input_col2:
 col1, col2 = st.columns([1, 1])
 with col1:
     keep_going = st.checkbox("Skip failed codes and continue", value=True)
-# with col2:
     output_name = st.text_input("Output file name", value="vimar_datasheet_pack.pdf")
+
+with col2:
+    uploaded_cover = st.file_uploader(
+        "Use another cover page (optional)",
+        type=["pdf"],
+        help="Leave empty to use the default cover PDF included in the repository.",
+    )
 
 st.markdown(
     """
@@ -548,6 +596,11 @@ if run_clicked:
     if not codes:
         st.error("Please enter item codes manually or upload an Excel file.")
     else:
+        cover_pdf_bytes, cover_error = get_cover_pdf_bytes(uploaded_cover)
+        if cover_error:
+            st.error(cover_error)
+            st.stop()
+
         max_workers = min(8, max(1, len(codes)))
 
         downloaded_pdfs, success_rows, failed_codes, _ = download_pdfs_parallel(
@@ -582,7 +635,7 @@ if run_clicked:
             st.error("No PDFs were downloaded, so no merged file could be created.")
         else:
             try:
-                merged_pdf = merge_pdf_bytes(downloaded_pdfs)
+                merged_pdf = merge_pdf_bytes(downloaded_pdfs, cover_pdf_bytes=cover_pdf_bytes)
 
                 st.success("Your consolidated PDF pack is ready.")
 
