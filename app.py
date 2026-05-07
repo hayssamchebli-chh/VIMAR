@@ -218,7 +218,7 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
             completed += 1
 
             code = result["code"]
-            status_text.info(f"Processed {completed} of {len(codes)} — {code}")
+            status_text.info(f"Processed {completed} of {len(codes)} - {code}")
             progress_bar.progress(completed / len(codes))
 
             results.append(result)
@@ -244,13 +244,28 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
     return downloaded_pdfs, success_rows, failed_codes, results
 
 
+def render_step(number: str, title: str, text: str) -> None:
+    st.markdown(
+        f"""
+        <div class="process-card">
+            <div class="process-number">{number}</div>
+            <div>
+                <div class="process-title">{title}</div>
+                <div class="process-text">{text}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # ---------------------------
 # Page config
 # ---------------------------
 st.set_page_config(
     page_title="Vimar Datasheet Pack Builder",
-    page_icon="📘",
-    layout="centered",
+    page_icon="V",
+    layout="wide",
 )
 
 
@@ -261,119 +276,396 @@ st.markdown(
     """
     <style>
         :root {
-            --navy: #1f2a44;
-            --navy-2: #2f3d5c;
-            --navy-soft: #e9eef7;
-            --grey-bg: #f3f4f6;
-            --grey-card: #ffffff;
-            --grey-border: #d1d5db;
-            --grey-muted: #6b7280;
+            --vimar-yellow: #ffc400;
+            --vimar-yellow-soft: #fff5c7;
+            --vimar-black: #151515;
+            --vimar-ink: #202020;
+            --vimar-muted: #707070;
+            --vimar-line: #dedede;
+            --vimar-silver: #f3f3f1;
+            --vimar-warm: #eeece7;
+            --vimar-panel: #ffffff;
+            --vimar-shadow: rgba(20, 20, 20, 0.08);
+        }
+
+        #MainMenu,
+        footer,
+        header[data-testid="stHeader"] {
+            visibility: hidden;
+            height: 0;
         }
 
         .stApp {
-            background-color: var(--grey-bg);
+            background:
+                radial-gradient(circle at top right, rgba(255, 196, 0, 0.18), transparent 24rem),
+                linear-gradient(180deg, #ffffff 0%, var(--vimar-warm) 58%, #f8f8f6 100%);
+            color: var(--vimar-ink);
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-            max-width: 1000px;
+            padding-top: 1.2rem;
+            padding-bottom: 2.5rem;
+            max-width: 1180px;
         }
 
-        .hero-card {
-            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
-            color: white;
-            border-radius: 18px;
-            padding: 1.6rem 1.6rem 1.4rem 1.6rem;
-            box-shadow: 0 10px 25px rgba(31, 42, 68, 0.18);
-            margin-bottom: 1.2rem;
+        .vimar-shell {
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid var(--vimar-line);
+            box-shadow: 0 18px 44px var(--vimar-shadow);
+            margin-bottom: 1.25rem;
         }
 
-        .hero-badge {
-            display: inline-block;
+        .utility-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1.15rem;
+            padding: 0.55rem 1.1rem;
+            border-bottom: 1px solid var(--vimar-line);
+            color: var(--vimar-muted);
             font-size: 0.78rem;
-            font-weight: 600;
-            letter-spacing: 0.4px;
-            background: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.16);
-            padding: 0.35rem 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .brand-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
+            padding: 1.05rem 1.1rem 0.95rem 1.1rem;
+        }
+
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-symbol {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            border: 1px solid #b8b8b8;
+            background: linear-gradient(135deg, #ffffff 0%, #c6c8c9 100%);
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,0.55), 0 8px 18px rgba(0,0,0,0.12);
+        }
+
+        .brand-symbol::before {
+            content: "";
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            top: 8px;
+            height: 20px;
+            border-radius: 4px 4px 2px 2px;
+            background: linear-gradient(135deg, #ffe37c 0%, var(--vimar-yellow) 52%, #e8a400 100%);
+            clip-path: polygon(0 0, 100% 0, 82% 100%, 18% 100%);
+        }
+
+        .brand-symbol::after {
+            content: "";
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            height: 16px;
+            background: linear-gradient(135deg, #151515 0%, #6c7378 100%);
+            clip-path: polygon(0 0, 50% 100%, 100% 0, 100% 100%, 0 100%);
+        }
+
+        .brand-word {
+            font-size: 2.22rem;
+            line-height: 0.9;
+            font-weight: 900;
+            color: var(--vimar-black);
+            letter-spacing: 0.015em;
+        }
+
+        .brand-payoff {
+            margin-top: 0.2rem;
+            color: var(--vimar-black);
+            font-size: 0.86rem;
+            letter-spacing: 0.42em;
+            font-weight: 300;
+        }
+
+        .search-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border: 1px solid var(--vimar-line);
+            background: var(--vimar-silver);
+            color: var(--vimar-muted);
             border-radius: 999px;
-            margin-bottom: 0.8rem;
+            padding: 0.62rem 0.95rem;
+            font-size: 0.88rem;
+            min-width: 210px;
+            justify-content: space-between;
         }
 
-        .hero-title {
-            font-size: 2rem;
+        .search-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--vimar-yellow);
+            box-shadow: 0 0 0 5px rgba(255, 196, 0, 0.18);
+        }
+
+        .nav-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0;
+            border-top: 1px solid var(--vimar-line);
+        }
+
+        .nav-item {
+            padding: 0.82rem 1.05rem;
+            border-right: 1px solid var(--vimar-line);
+            color: var(--vimar-ink);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.045em;
             font-weight: 700;
-            line-height: 1.2;
-            margin-bottom: 0.45rem;
         }
 
-        .hero-subtitle {
-            font-size: 1rem;
-            color: #e5e7eb;
-            line-height: 1.55;
-            margin-bottom: 0;
+        .nav-item:first-child {
+            background: var(--vimar-yellow);
         }
 
-        .section-card {
-            background: var(--grey-card);
-            border: 1px solid var(--grey-border);
-            border-radius: 16px;
-            padding: 1.2rem 1.2rem 1rem 1.2rem;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+        .hero-section {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1.25fr 0.75fr;
+            gap: 1.5rem;
+            align-items: stretch;
+            background: linear-gradient(135deg, #f7f5ef 0%, #ffffff 55%, #e9e7e1 100%);
+            border: 1px solid var(--vimar-line);
+            box-shadow: 0 18px 46px var(--vimar-shadow);
+            padding: 2rem;
             margin-bottom: 1rem;
         }
 
-        .section-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--navy);
-            margin-bottom: 0.2rem;
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            color: var(--vimar-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-weight: 800;
         }
 
-        .section-subtitle {
-            font-size: 0.93rem;
-            color: var(--grey-muted);
-            margin-bottom: 0.8rem;
+        .hero-kicker::before {
+            content: "";
+            display: block;
+            width: 34px;
+            height: 5px;
+            background: var(--vimar-yellow);
         }
 
-        .panel-title {
-            color: var(--navy);
-            font-size: 1rem;
+        .hero-title {
+            margin: 0.75rem 0 0.7rem 0;
+            color: var(--vimar-black);
+            font-size: clamp(2.15rem, 4vw, 4rem);
+            line-height: 0.98;
+            letter-spacing: -0.045em;
+            font-weight: 900;
+        }
+
+        .hero-copy {
+            max-width: 680px;
+            color: #505050;
+            font-size: 1.03rem;
+            line-height: 1.72;
+            margin-bottom: 1.2rem;
+        }
+
+        .hero-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+
+        .hero-tag {
+            background: #ffffff;
+            border: 1px solid var(--vimar-line);
+            border-left: 5px solid var(--vimar-yellow);
+            padding: 0.55rem 0.72rem;
+            font-size: 0.82rem;
+            color: var(--vimar-ink);
             font-weight: 700;
+        }
+
+        .hero-visual {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 245px;
+        }
+
+        .device-card {
+            width: min(100%, 330px);
+            aspect-ratio: 1.72 / 1;
+            border-radius: 22px;
+            background: linear-gradient(145deg, #ffffff 0%, #ecebe6 100%);
+            border: 1px solid #d5d5d2;
+            box-shadow: 0 24px 44px rgba(0, 0, 0, 0.13);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            padding: 1.1rem;
+            transform: rotate(-2deg);
+        }
+
+        .device-switch {
+            width: 66px;
+            height: 118px;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #fbfbfb 0%, #e1e1df 100%);
+            border: 1px solid #c9c9c7;
+            box-shadow: inset 0 1px 0 #ffffff, 0 10px 18px rgba(0,0,0,0.07);
+        }
+
+        .device-switch:nth-child(2) {
+            transform: translateY(-8px);
+            border-top: 7px solid var(--vimar-yellow);
+        }
+
+        .device-switch:nth-child(3) {
+            transform: translateY(7px);
+        }
+
+        .process-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.85rem;
+            margin: 0 0 1.25rem 0;
+        }
+
+        .process-card {
+            display: flex;
+            gap: 0.85rem;
+            min-height: 98px;
+            background: rgba(255,255,255,0.93);
+            border: 1px solid var(--vimar-line);
+            border-bottom: 4px solid var(--vimar-yellow);
+            padding: 1rem;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.05);
+        }
+
+        .process-number {
+            flex: 0 0 auto;
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            background: var(--vimar-black);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 0.88rem;
+        }
+
+        .process-title {
+            color: var(--vimar-black);
+            font-weight: 900;
+            font-size: 0.98rem;
             margin-bottom: 0.25rem;
         }
 
+        .process-text {
+            color: var(--vimar-muted);
+            font-size: 0.86rem;
+            line-height: 1.46;
+        }
+
+        .section-heading {
+            margin: 1.15rem 0 0.75rem 0;
+            padding: 0 0 0.65rem 0;
+            border-bottom: 1px solid var(--vimar-line);
+        }
+
+        .section-eyebrow {
+            color: var(--vimar-muted);
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .section-title {
+            color: var(--vimar-black);
+            font-size: 1.42rem;
+            font-weight: 900;
+            margin-top: 0.15rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-subtitle {
+            color: var(--vimar-muted);
+            font-size: 0.94rem;
+            line-height: 1.6;
+            margin-top: 0.2rem;
+        }
+
+        .panel-title {
+            color: var(--vimar-black);
+            font-size: 1.02rem;
+            font-weight: 900;
+            margin-bottom: 0.25rem;
+        }
+
+        .panel-title::before {
+            content: "";
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            background: var(--vimar-yellow);
+            margin-right: 0.45rem;
+            transform: translateY(-1px);
+        }
+
         .panel-subtitle {
-            color: var(--grey-muted);
+            color: var(--vimar-muted);
             font-size: 0.88rem;
             margin-bottom: 0.8rem;
+            line-height: 1.55;
         }
 
         div[data-testid="stTextArea"] textarea {
-            background-color: #fbfbfc !important;
-            border: 1px solid var(--grey-border) !important;
-            border-radius: 12px !important;
-            color: #111827 !important;
+            background-color: #ffffff !important;
+            border: 1px solid var(--vimar-line) !important;
+            border-left: 5px solid var(--vimar-yellow) !important;
+            border-radius: 0 !important;
+            color: var(--vimar-ink) !important;
             font-size: 0.95rem !important;
-            min-height: 220px !important;
+            min-height: 232px !important;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.04) !important;
         }
 
         div[data-testid="stTextInput"] input,
         div[data-testid="stSelectbox"] div[data-baseweb="select"] {
-            background-color: #fbfbfc !important;
-            border-radius: 12px !important;
+            background-color: #ffffff !important;
+            border: 1px solid var(--vimar-line) !important;
+            border-radius: 0 !important;
+            color: var(--vimar-ink) !important;
         }
 
         div[data-testid="stFileUploader"] {
-            background: #fbfbfc !important;
-            border: 2px dashed #b9c2d0 !important;
-            border-radius: 12px !important;
-            padding: 24px !important;
-            min-height: 220px !important;
+            background: #ffffff !important;
+            border: 1px solid var(--vimar-line) !important;
+            border-left: 5px solid var(--vimar-yellow) !important;
+            border-radius: 0 !important;
+            padding: 22px !important;
+            min-height: 190px !important;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.04) !important;
         }
 
         div[data-testid="stFileUploader"] section {
@@ -385,75 +677,112 @@ st.markdown(
         div[data-testid="stCheckbox"] label,
         div[data-testid="stSelectbox"] label,
         div[data-testid="stFileUploader"] label {
-            color: var(--navy) !important;
-            font-weight: 600 !important;
+            color: var(--vimar-black) !important;
+            font-weight: 800 !important;
         }
 
         .stButton > button,
         div[data-testid="stDownloadButton"] > button {
-            background: var(--navy) !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 12px !important;
-            font-weight: 600 !important;
-            padding: 0.7rem 1rem !important;
-            box-shadow: 0 8px 18px rgba(31, 42, 68, 0.14);
+            background: var(--vimar-black) !important;
+            color: #ffffff !important;
+            border: 1px solid var(--vimar-black) !important;
+            border-radius: 0 !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.04em !important;
+            text-transform: uppercase !important;
+            padding: 0.86rem 1rem !important;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.14);
         }
 
         .stButton > button:hover,
         div[data-testid="stDownloadButton"] > button:hover {
-            background: #172033 !important;
+            background: var(--vimar-yellow) !important;
+            border-color: var(--vimar-yellow) !important;
+            color: var(--vimar-black) !important;
         }
 
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 0.9rem;
-            margin: 1rem 0 1rem 0;
+            margin: 1.25rem 0 1rem 0;
         }
 
         .metric-card {
-            background: white;
-            border: 1px solid var(--grey-border);
-            border-radius: 14px;
-            padding: 1rem;
-            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+            background: #ffffff;
+            border: 1px solid var(--vimar-line);
+            border-top: 6px solid var(--vimar-yellow);
+            padding: 1.1rem;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.05);
         }
 
         .metric-label {
-            color: var(--grey-muted);
-            font-size: 0.85rem;
-            margin-bottom: 0.35rem;
+            color: var(--vimar-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            font-weight: 900;
+            margin-bottom: 0.45rem;
         }
 
         .metric-value {
-            color: var(--navy);
-            font-size: 1.7rem;
-            font-weight: 700;
+            color: var(--vimar-black);
+            font-size: 2rem;
+            font-weight: 900;
             line-height: 1.1;
         }
 
         .info-note {
-            background: var(--navy-soft);
-            border: 1px solid #d7deea;
-            color: var(--navy);
-            border-radius: 12px;
-            padding: 0.85rem 1rem;
+            background: var(--vimar-yellow-soft);
+            border: 1px solid #f1d861;
+            color: var(--vimar-black);
+            padding: 0.92rem 1rem;
             font-size: 0.93rem;
-            margin-top: 0.5rem;
+            margin-top: 0.9rem;
+            line-height: 1.55;
         }
 
         .footer-note {
             text-align: center;
-            color: var(--grey-muted);
-            font-size: 0.85rem;
-            margin-top: 1rem;
+            color: var(--vimar-muted);
+            font-size: 0.82rem;
+            margin-top: 1.4rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
         div[data-testid="stExpander"] {
-            background: white;
-            border: 1px solid var(--grey-border);
-            border-radius: 12px;
+            background: #ffffff;
+            border: 1px solid var(--vimar-line);
+            border-radius: 0;
+        }
+
+        @media (max-width: 900px) {
+            .utility-bar,
+            .brand-row,
+            .nav-row {
+                justify-content: flex-start;
+            }
+
+            .brand-row,
+            .hero-section,
+            .process-grid,
+            .metric-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-section {
+                display: block;
+                padding: 1.35rem;
+            }
+
+            .hero-visual {
+                margin-top: 1rem;
+            }
+
+            .search-pill {
+                display: none;
+            }
         }
     </style>
     """,
@@ -466,17 +795,74 @@ st.markdown(
 # ---------------------------
 st.markdown(
     """
-    <div class="hero-card">
-        <div class="hero-badge">PDF AUTOMATION TOOL</div>
-        <div class="hero-title">Vimar Datasheet Pack Builder</div>
-        <div class="hero-subtitle">
-            Enter Vimar item codes, retrieve their datasheet PDFs automatically,
-            and generate one consolidated PDF pack ready for download.
+    <div class="vimar-shell">
+        <div class="utility-bar">
+            <span>Product catalogue</span>
+            <span>Work with us</span>
+            <span>MyVIMAR</span>
+        </div>
+        <div class="brand-row">
+            <div class="brand-lockup">
+                <div class="brand-symbol" aria-hidden="true"></div>
+                <div>
+                    <div class="brand-word">VIMAR</div>
+                    <div class="brand-payoff">energia positiva</div>
+                </div>
+            </div>
+            <div class="search-pill">
+                <span>Search on the site</span>
+                <span class="search-dot"></span>
+            </div>
+        </div>
+        <div class="nav-row">
+            <div class="nav-item">Products</div>
+            <div class="nav-item">Solutions</div>
+            <div class="nav-item">Services for professionals</div>
+            <div class="nav-item">News &amp; documentation</div>
+            <div class="nav-item">Contacts</div>
+            <div class="nav-item">Company</div>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
+
+st.markdown(
+    """
+    <div class="hero-section">
+        <div>
+            <div class="hero-kicker">Product documentation</div>
+            <div class="hero-title">Datasheet pack builder</div>
+            <div class="hero-copy">
+                Enter Vimar item codes, retrieve datasheet PDFs automatically,
+                add the cover page, and generate one consolidated PDF pack ready for download.
+            </div>
+            <div class="hero-tags">
+                <div class="hero-tag">Vimar codes</div>
+                <div class="hero-tag">Excel import</div>
+                <div class="hero-tag">Cover PDF</div>
+                <div class="hero-tag">Merged pack</div>
+            </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+            <div class="device-card">
+                <div class="device-switch"></div>
+                <div class="device-switch"></div>
+                <div class="device-switch"></div>
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+step_col1, step_col2, step_col3 = st.columns(3)
+with step_col1:
+    render_step("01", "Add codes", "Paste codes manually or import them from an Excel column.")
+with step_col2:
+    render_step("02", "Choose cover", "Use the repository cover or upload a custom PDF cover.")
+with step_col3:
+    render_step("03", "Build pack", "Download and merge all retrieved datasheets in order.")
 
 
 # ---------------------------
@@ -484,10 +870,11 @@ st.markdown(
 # ---------------------------
 st.markdown(
     """
-    <div class="section-card">
-        <div class="section-title">Build your PDF pack</div>
+    <div class="section-heading">
+        <div class="section-eyebrow">Build your PDF pack</div>
+        <div class="section-title">Codes and source file</div>
         <div class="section-subtitle">
-            Add codes manually or upload an Excel file and select the column containing the item codes.
+            Codes from manual input and Excel are combined automatically and duplicates are removed.
         </div>
     </div>
     """,
@@ -514,7 +901,7 @@ with input_col1:
 
     codes_text = st.text_area(
         "Paste item codes",
-        height=220,
+        height=232,
         placeholder="Example:\n00200\nK40930\nVIM-09208.C",
         label_visibility="collapsed",
     )
@@ -526,7 +913,7 @@ with input_col2:
         """
         <div class="panel-title">Upload Excel file</div>
         <div class="panel-subtitle">
-            Drag and drop your Excel file here, or browse to upload it.
+            Drag and drop your Excel file here, then choose the column containing item codes.
         </div>
         """,
         unsafe_allow_html=True,
@@ -563,12 +950,25 @@ with input_col2:
         except Exception as e:
             st.error(f"Could not read Excel file: {e}")
 
-col1, col2 = st.columns([1, 1])
-with col1:
+st.markdown(
+    """
+    <div class="section-heading">
+        <div class="section-eyebrow">Pack settings</div>
+        <div class="section-title">Cover and output</div>
+        <div class="section-subtitle">
+            Leave the cover field empty to use the default cover PDF included in the repository.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+settings_col1, settings_col2 = st.columns(2)
+with settings_col1:
     keep_going = st.checkbox("Skip failed codes and continue", value=True)
     output_name = st.text_input("Output file name", value="vimar_datasheet_pack.pdf")
 
-with col2:
+with settings_col2:
     uploaded_cover = st.file_uploader(
         "Use another cover page (optional)",
         type=["pdf"],
@@ -578,7 +978,7 @@ with col2:
 st.markdown(
     """
     <div class="info-note">
-        Codes from manual input and Excel are combined automatically and duplicates are removed.
+        The final PDF uses the selected cover first, followed by the downloaded Vimar datasheets.
     </div>
     """,
     unsafe_allow_html=True,
@@ -665,3 +1065,4 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
