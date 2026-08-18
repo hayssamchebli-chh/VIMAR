@@ -1,4 +1,5 @@
 import re
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Iterable, List, Tuple
@@ -17,6 +18,11 @@ BASE_URLS = [
 
 DEFAULT_TIMEOUT = (20, 40)
 PDF_DOWNLOAD_RETRIES = 2
+RETRY_BACKOFF_SECONDS = 1.5
+
+# Vimar sits behind Imperva Incapsula. High concurrency reads as scraping and
+# gets the caller IP blocked, so keep the request rate conservative.
+MAX_WORKERS = 3
 
 APP_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
 DEFAULT_COVER_PATHS = [
@@ -77,6 +83,36 @@ def looks_like_pdf(response: requests.Response) -> bool:
     return response.content[:5] == b"%PDF-"
 
 
+BLOCK_MARKERS = (
+    b"Incapsula",
+    b"_Incapsula_Resource",
+    b"Request unsuccessful",
+    b"Access Denied",
+    b"Attention Required",
+    b"cf-browser-verification",
+)
+
+
+def is_bot_block_response(response: requests.Response) -> bool:
+    """True when the origin returned a WAF / bot-protection interstitial.
+
+    Vimar fronts the site with Imperva Incapsula, which answers blocked
+    clients with a small HTML challenge page - often under a 200 status.
+    Without this check such a response is indistinguishable from a missing
+    datasheet, which makes real outages look like unknown product codes.
+    """
+    content_type = (response.headers.get("Content-Type") or "").lower()
+    body = response.content[:4096]
+
+    if response.status_code in (403, 429, 503):
+        return True
+
+    if "html" in content_type and any(marker in body for marker in BLOCK_MARKERS):
+        return True
+
+    return False
+
+
 def is_valid_pdf_bytes(pdf_bytes: bytes) -> bool:
     try:
         reader = PdfReader(BytesIO(pdf_bytes), strict=False)
@@ -128,21 +164,44 @@ def get_session() -> requests.Session:
 
 def download_pdf_bytes_for_code(
     session: requests.Session, code: str
-) -> Tuple[bool, bytes | None, str | None]:
+) -> Tuple[bool, bytes | None, str | None, str]:
+    """Fetch the datasheet for one code.
+
+    Returns (ok, pdf_bytes, used_url, reason) where reason is one of
+    "ok", "blocked", "not_found" or "network_error".
+    """
+    blocked = False
+    network_error = False
+
     for url_template in BASE_URLS:
         url = url_template.format(code=code)
 
-        for _ in range(PDF_DOWNLOAD_RETRIES):
+        for attempt in range(PDF_DOWNLOAD_RETRIES):
             try:
                 response = session.get(url, timeout=DEFAULT_TIMEOUT, allow_redirects=True)
+
+                if is_bot_block_response(response):
+                    # Retrying or trying sibling URLs only deepens the block.
+                    return False, None, None, "blocked"
+
                 if response.status_code == 200 and looks_like_pdf(response):
                     pdf_bytes = response.content
                     if is_valid_pdf_bytes(pdf_bytes):
-                        return True, pdf_bytes, url
-            except requests.RequestException:
-                pass
+                        return True, pdf_bytes, url, "ok"
 
-    return False, None, None
+                if response.status_code == 404:
+                    break
+
+            except requests.RequestException:
+                network_error = True
+
+            if attempt + 1 < PDF_DOWNLOAD_RETRIES:
+                time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+
+    if blocked:
+        return False, None, None, "blocked"
+
+    return False, None, None, "network_error" if network_error else "not_found"
 
 
 def merge_pdf_bytes(pdf_byte_list: List[bytes], cover_pdf_bytes: bytes | None = None) -> bytes:
@@ -185,7 +244,7 @@ def extract_codes_from_selected_column(df: pd.DataFrame, selected_column: str) -
 
 def process_code(index: int, code: str) -> dict:
     session = get_session()
-    ok, pdf_bytes, used_url = download_pdf_bytes_for_code(session, code)
+    ok, pdf_bytes, used_url, reason = download_pdf_bytes_for_code(session, code)
 
     return {
         "index": index,
@@ -193,6 +252,7 @@ def process_code(index: int, code: str) -> dict:
         "ok": ok,
         "pdf_bytes": pdf_bytes,
         "used_url": used_url,
+        "reason": reason,
     }
 
 
@@ -228,6 +288,8 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
     # Sort back to the original input order
     results.sort(key=lambda x: x["index"])
 
+    blocked_count = sum(1 for result in results if result.get("reason") == "blocked")
+
     for result in results:
         if result["ok"] and result["pdf_bytes"]:
             downloaded_pdfs.append(result["pdf_bytes"])
@@ -241,7 +303,7 @@ def download_pdfs_parallel(codes: List[str], max_workers: int = 8):
         else:
             failed_codes.append(result["code"])
 
-    return downloaded_pdfs, success_rows, failed_codes, results
+    return downloaded_pdfs, success_rows, failed_codes, results, blocked_count
 
 
 def render_step(number: str, title: str, text: str) -> None:
@@ -986,61 +1048,96 @@ if run_clicked:
             st.error(cover_error)
             st.stop()
 
-        max_workers = min(8, max(1, len(codes)))
+        max_workers = min(MAX_WORKERS, max(1, len(codes)))
 
-        downloaded_pdfs, success_rows, failed_codes, _ = download_pdfs_parallel(
+        downloaded_pdfs, success_rows, failed_codes, _, blocked_count = download_pdfs_parallel(
             codes=codes,
             max_workers=max_workers,
         )
-        submitted_count = len(codes)
-        downloaded_count = len(downloaded_pdfs)
-        failed_count = len(failed_codes)
 
-        st.markdown(
-            f"""
-            <div class="metric-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Submitted</div>
-                    <div class="metric-value">{submitted_count}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Downloaded</div>
-                    <div class="metric-value">{downloaded_count}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Failed</div>
-                    <div class="metric-value">{failed_count}</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if downloaded_count == 0:
-            st.error("No PDFs were downloaded, so no merged file could be created.")
-        else:
+        merged_pdf = None
+        merge_error = None
+        if downloaded_pdfs:
             try:
                 merged_pdf = merge_pdf_bytes(downloaded_pdfs, cover_pdf_bytes=cover_pdf_bytes)
+            except Exception as exc:
+                merge_error = str(exc)
 
-                st.success("Your consolidated PDF pack is ready.")
+        # Keep the outcome across the rerun that Streamlit triggers when the
+        # download button is clicked, otherwise the results vanish on click.
+        st.session_state["last_run"] = {
+            "submitted": len(codes),
+            "downloaded": len(downloaded_pdfs),
+            "failed": len(failed_codes),
+            "blocked": blocked_count,
+            "success_rows": success_rows,
+            "failed_codes": failed_codes,
+            "merged_pdf": merged_pdf,
+            "merge_error": merge_error,
+            "file_name": ensure_pdf_filename(output_name),
+        }
 
-                st.download_button(
-                    label="Download Merged PDF",
-                    data=merged_pdf,
-                    file_name=ensure_pdf_filename(output_name),
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
+last_run = st.session_state.get("last_run")
 
-                with st.expander("Downloaded items", expanded=False):
-                    st.dataframe(success_rows, use_container_width=True)
+if last_run:
+    submitted_count = last_run["submitted"]
+    downloaded_count = last_run["downloaded"]
+    failed_count = last_run["failed"]
+    blocked_count = last_run["blocked"]
+    success_rows = last_run["success_rows"]
+    failed_codes = last_run["failed_codes"]
 
-                if failed_codes:
-                    with st.expander("Failed codes", expanded=True):
-                        st.warning(", ".join(failed_codes))
+    st.markdown(
+        f"""
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-label">Submitted</div>
+                <div class="metric-value">{submitted_count}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Downloaded</div>
+                <div class="metric-value">{downloaded_count}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Failed</div>
+                <div class="metric-value">{failed_count}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-            except Exception as e:
-                st.error(f"Failed to merge PDFs: {e}")
+    if blocked_count:
+        st.error(
+            f"Vimar's website refused {blocked_count} of {submitted_count} requests. "
+            "The site is behind Imperva Incapsula bot protection, which is serving a "
+            "block page instead of the datasheet PDFs. This is not a fault in this app: "
+            "the same URLs are blocked in a normal browser from this network too. "
+            "The download will keep failing until Vimar allows this network again."
+        )
+
+    if downloaded_count == 0:
+        if not blocked_count:
+            st.error("No PDFs were downloaded, so no merged file could be created.")
+    elif last_run["merge_error"]:
+        st.error(f"Failed to merge PDFs: {last_run['merge_error']}")
+    else:
+        st.success("Your consolidated PDF pack is ready.")
+
+        st.download_button(
+            label="Download Merged PDF",
+            data=last_run["merged_pdf"],
+            file_name=last_run["file_name"],
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+        with st.expander("Downloaded items", expanded=False):
+            st.dataframe(success_rows, use_container_width=True)
+
+    if failed_codes:
+        with st.expander("Failed codes", expanded=True):
+            st.warning(", ".join(failed_codes))
 
 st.markdown(
     """

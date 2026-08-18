@@ -1,5 +1,5 @@
-streamlit
-requests
-pypdf
-pandas
-openpyxl
+streamlit>=1.59,<2
+requests>=2.32,<3
+pypdf>=6.0,<7
+pandas>=2.2,<4
+openpyxl>=3.1,<4
