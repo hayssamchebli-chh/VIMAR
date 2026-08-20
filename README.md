@@ -5,14 +5,30 @@ from vimar.com and merge everything into one PDF pack — same layout as the
 Lightning datasheet pack: a clickable table of contents, then a cover page
 carrying the item's Type before each datasheet.
 
-## Setup (one time, per person)
+## Setup
 
-Each colleague runs their own copy and does their own one-time Vimar
+Each person runs their own copy and does their own one-time Vimar
 verification — nothing is shared between machines, and no server needs to
 stay running.
 
 **Prerequisite:** Chrome or Edge already installed normally (most Windows PCs
 already have one).
+
+### If you don't use the command line
+
+1. Download this project as a ZIP: [Download](https://github.com/hayssamchebli-chh/VIMAR/archive/refs/heads/verified-browser-download.zip),
+   then right-click the downloaded file → **Extract All**.
+2. Open the extracted folder and double-click **`setup.bat`**. This runs once:
+   it checks Python is installed, installs everything the tool needs, and
+   puts a **"Vimar Datasheet Tool"** icon on your Desktop.
+   - If it says Python is missing, it opens the download page for you — install
+     it (tick **"Add python.exe to PATH"** during install), then run
+     `setup.bat` again.
+3. From then on, just double-click the **Vimar Datasheet Tool** icon on your
+   Desktop whenever you want to use it — a black window opens (leave it
+   running) and your browser opens the app automatically.
+
+### If you're comfortable with the command line
 
 ```bash
 git clone --branch verified-browser-download https://github.com/hayssamchebli-chh/VIMAR.git
@@ -23,7 +39,8 @@ python -m streamlit run app.py
 ```
 
 This opens the app in your browser at `http://localhost:8501`. Next time, just
-run the last command again from inside the `VIMAR` folder.
+run the last command again from inside the `VIMAR` folder (or use
+`start.bat`).
 
 ## Codes
 
