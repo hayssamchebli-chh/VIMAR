@@ -1,0 +1,3 @@
+__pycache__/
+*.pyc
+manual_datasheets/*.pdf
