@@ -58,13 +58,16 @@ def render_step(number: str, title: str, text: str) -> None:
 
 
 def render_metric_grid(cards: list[tuple[str, object]]) -> None:
+    # Built as compact single-line HTML with no blank lines or indentation:
+    # Streamlit's markdown renderer only passes raw HTML through until the
+    # first blank line, after which indented lines are read as a Markdown
+    # code block instead of HTML - which silently breaks multi-card grids
+    # built from indented, joined f-strings.
     cells = "".join(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">{label}</div>
-            <div class="metric-value">{value}</div>
-        </div>
-        """
+        f'<div class="metric-card">'
+        f'<div class="metric-label">{label}</div>'
+        f'<div class="metric-value">{value}</div>'
+        f'</div>'
         for label, value in cards
     )
     st.markdown(f'<div class="metric-grid">{cells}</div>', unsafe_allow_html=True)
