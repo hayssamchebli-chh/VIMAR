@@ -701,8 +701,7 @@ with right_col:
     st.markdown(
         """
         <div class="panel-title">Upload Excel file</div>
-        <div class="panel-subtitle">Columns: Type, Code, Description. The Type is written
-            on the cover page before each datasheet.</div>
+        <div class="panel-subtitle">Columns: Type, Code, Description.</div> 
         """,
         unsafe_allow_html=True,
     )
