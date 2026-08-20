@@ -18,7 +18,6 @@ try {
     Write-Host ""
     Write-Host "Could not download the update. Check your internet connection and try again."
     Write-Host "Error: $_"
-    Read-Host "Press Enter to close"
     exit 1
 }
 
@@ -28,7 +27,6 @@ Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
 $extracted = Get-ChildItem $tmpDir -Directory | Select-Object -First 1
 if (-not $extracted) {
     Write-Host "The downloaded update looked empty - nothing was changed."
-    Read-Host "Press Enter to close"
     exit 1
 }
 
@@ -65,4 +63,3 @@ Write-Host "============================================"
 Write-Host "  Update complete! You can close this window"
 Write-Host "  and use the tool as normal."
 Write-Host "============================================"
-Read-Host "Press Enter to close"
