@@ -42,17 +42,13 @@ DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 MAX_WORKERS = 3  # vimar.com throttles parallel traffic
 
 
-def render_step(number: str, title: str, text: str) -> None:
+def render_step(number: str, title: str, text: str = "") -> None:
+    text_html = f'<div class="process-text">{text}</div>' if text else ""
     st.markdown(
-        f"""
-        <div class="process-card">
-            <div class="process-number">{number}</div>
-            <div>
-                <div class="process-title">{title}</div>
-                <div class="process-text">{text}</div>
-            </div>
-        </div>
-        """,
+        f'<div class="process-card">'
+        f'<div class="process-number">{number}</div>'
+        f'<div><div class="process-title">{title}</div>{text_html}</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -701,7 +697,7 @@ with right_col:
     st.markdown(
         """
         <div class="panel-title">Upload Excel file</div>
-        <div class="panel-subtitle">Columns: Type, Code, Description.</div> 
+        <div class="panel-subtitle">Columns: Type, Code, Description.</div>
         """,
         unsafe_allow_html=True,
     )
