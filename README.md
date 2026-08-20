@@ -5,14 +5,25 @@ from vimar.com and merge everything into one PDF pack — same layout as the
 Lightning datasheet pack: a clickable table of contents, then a cover page
 carrying the item's Type before each datasheet.
 
-## Run it
+## Setup (one time, per person)
+
+Each colleague runs their own copy and does their own one-time Vimar
+verification — nothing is shared between machines, and no server needs to
+stay running.
+
+**Prerequisite:** Chrome or Edge already installed normally (most Windows PCs
+already have one).
 
 ```bash
-cd C:\Users\hayss\local\vimar-datasheets
+git clone --branch verified-browser-download https://github.com/hayssamchebli-chh/VIMAR.git
+cd VIMAR
 pip install -r requirements.txt
 python -m playwright install chromium
 python -m streamlit run app.py
 ```
+
+This opens the app in your browser at `http://localhost:8501`. Next time, just
+run the last command again from inside the `VIMAR` folder.
 
 ## Codes
 
