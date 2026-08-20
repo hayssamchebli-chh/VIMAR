@@ -11,6 +11,27 @@ echo   2. Install the tool's requirements
 echo   3. Put a "Vimar Datasheet Tool" icon on your Desktop
 echo.
 
+if not exist "%~dp0app.py" (
+    echo ============================================
+    echo   Please extract the ZIP file first
+    echo ============================================
+    echo.
+    echo This is still running from inside the ZIP file, not from a
+    echo real folder on your computer - the files it needs are not
+    echo actually here yet.
+    echo.
+    echo Please close this window and:
+    echo   1. Right-click the downloaded ZIP file
+    echo   2. Choose "Extract All..."
+    echo   3. Pick a folder ^(e.g. your Desktop^) and click Extract
+    echo   4. Open the NEW folder that appears - it will look like a
+    echo      normal folder, not a zipped one
+    echo   5. Double-click setup.bat from inside that new folder
+    echo.
+    pause
+    exit /b 1
+)
+
 where python >nul 2>nul
 if errorlevel 1 (
     echo Python was not found on this computer.
