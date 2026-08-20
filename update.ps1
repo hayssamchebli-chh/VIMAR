@@ -36,7 +36,7 @@ Write-Host "Copying updated files..."
 $filesToUpdate = @(
     "app.py", "vimar.py", "merge.py",
     "requirements.txt", "README.md",
-    "item_type_template.pdf", "toc_logo.png",
+    "item_type_template.pdf", "toc_logo.png", "vimar_icon.ico",
     "setup.bat", "start.bat", "update.bat", "update.ps1"
 )
 $updated = 0
@@ -48,6 +48,18 @@ foreach ($f in $filesToUpdate) {
     }
 }
 Write-Host "  $updated file(s) updated."
+
+$iconPath = Join-Path $root "vimar_icon.ico"
+$shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "Vimar Datasheet Tool.lnk"
+if ((Test-Path $iconPath) -and (Test-Path $shortcutPath)) {
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    if ($shortcut.IconLocation -ne $iconPath) {
+        $shortcut.IconLocation = $iconPath
+        $shortcut.Save()
+        Write-Host "  Desktop shortcut icon updated."
+    }
+}
 
 Write-Host ""
 Write-Host "Checking requirements..."

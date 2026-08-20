@@ -74,7 +74,7 @@ if errorlevel 1 (
 echo.
 echo Creating your desktop shortcut...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$s = (New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Vimar Datasheet Tool.lnk'); $s.TargetPath = '%~dp0start.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = 'shell32.dll,13'; $s.Description = 'Vimar Datasheet Tool'; $s.Save()"
+    "$s = (New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Vimar Datasheet Tool.lnk'); $s.TargetPath = '%~dp0start.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = '%~dp0vimar_icon.ico'; $s.Description = 'Vimar Datasheet Tool'; $s.Save()"
 
 echo.
 echo ============================================
