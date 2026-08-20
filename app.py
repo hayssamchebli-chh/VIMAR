@@ -612,11 +612,11 @@ st.markdown(
 
 step_col1, step_col2, step_col3 = st.columns(3)
 with step_col1:
-    render_step("01", "Unlock vimar.com", "Pass the one-time human check in a browser window.")
+    render_step("01", "Unlock vimar.com")
 with step_col2:
-    render_step("02", "Add codes", "Paste codes manually or import them from an Excel column.")
+    render_step("02", "Add codes")
 with step_col3:
-    render_step("03", "Build pack", "Download and merge all retrieved datasheets in order.")
+    render_step("03", "Build pack")
 
 
 # ============================================================
