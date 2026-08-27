@@ -37,7 +37,8 @@ from vimar import (
     verification_status,
 )
 
-DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
+SAVED_DATASHEETS_DIR = os.path.join(os.path.expanduser("~"), "Downloads", "Vimar Datasheets")
+os.makedirs(SAVED_DATASHEETS_DIR, exist_ok=True)
 
 MAX_WORKERS = 3  # vimar.com throttles parallel traffic
 
@@ -788,9 +789,12 @@ with set_1:
     output_filename = st.text_input("Output PDF filename", value="vimar datasheets pack.pdf")
     watch_dir = st.text_input(
         "Also look for saved PDFs in",
-        value=DOWNLOADS_DIR,
-        help="Datasheets you saved from vimar.com yourself. Matched by filename "
-             "or by the code printed inside the PDF, so no renaming is needed.",
+        value=SAVED_DATASHEETS_DIR,
+        help="A dedicated folder, not your whole Downloads - drop datasheets you "
+             "saved from vimar.com yourself in here. Matched by filename or by the "
+             "code printed inside the PDF, so no renaming is needed. Keeping this "
+             "folder separate from the rest of Downloads means the app only ever "
+             "considers files you actually put there.",
     )
 
 with set_2:
