@@ -131,19 +131,39 @@ def looks_blocked(content: bytes) -> bool:
 # Download layers
 # ------------------------------------------------------------------
 
-def _key(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+def _code_pattern(code: str) -> re.Pattern:
+    """Regex matching `code` as a standalone token, not just a run of digits
+    buried inside an unrelated, longer number.
+
+    Tolerant of the code's own separators being written differently -
+    "20755.3.B", "20755_3_B", "20755-3-B" and "207553B" all match the code
+    "20755.3.B" - but anchored on both ends so e.g. code "582" cannot match
+    inside "Invoice_2058234" or "20582" cannot match inside "120582699".
+    """
+    parts = [p for p in re.split(r"[^A-Za-z0-9]+", code) if p]
+    body = r"[^A-Za-z0-9]*".join(re.escape(p) for p in parts)
+    return re.compile(rf"(?<![A-Za-z0-9]){body}(?![A-Za-z0-9])", re.IGNORECASE)
 
 
 def pdf_mentions_code(content: bytes, code: str) -> bool:
-    """True when the code appears in the PDF's own text (first pages)."""
+    """True when the code appears in the PDF's own text (first pages) as a
+    standalone token, in a document that actually looks like a Vimar one.
+
+    A raw digit match alone is too easy to trigger by coincidence - an
+    invoice number, a date, a page count in a completely unrelated PDF
+    sitting in the same folder - so this also requires the Vimar name to
+    show up somewhere on the page, which every real datasheet carries.
+    """
     try:
         reader = PdfReader(io.BytesIO(content))
         text = " ".join((page.extract_text() or "") for page in reader.pages[:2])
     except Exception:
         return False
 
-    return _key(code) in _key(text)
+    if "vimar" not in text.lower():
+        return False
+
+    return bool(_code_pattern(code).search(text))
 
 
 def find_saved_datasheet(code: str, folders: list[str] | None = None) -> tuple[bytes, str]:
@@ -156,7 +176,7 @@ def find_saved_datasheet(code: str, folders: list[str] | None = None) -> tuple[b
     Returns (content, path).
     """
     folders = [f for f in (folders or [MANUAL_DIR]) if f and os.path.isdir(f)]
-    wanted = _key(code)
+    pattern = _code_pattern(code)
 
     by_name: list[str] = []
     others: list[str] = []
@@ -172,9 +192,9 @@ def find_saved_datasheet(code: str, folders: list[str] | None = None) -> tuple[b
                 continue
 
             path = os.path.join(folder, filename)
-            stem = _key(os.path.splitext(filename)[0])
+            stem = os.path.splitext(filename)[0]
 
-            if stem in (wanted, "vima" + wanted, "vimar" + wanted) or wanted in stem:
+            if pattern.search(stem):
                 by_name.append(path)
             else:
                 others.append(path)
